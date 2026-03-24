@@ -2,7 +2,7 @@
 
 **Bachelor Thesis** | KTH Royal Institute of Technology | DD143X, 15 ECTS
 
-Supervisors: Axel Andersson, György Dán
+Supervisors: NN
 
 ---
 
