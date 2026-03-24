@@ -1,0 +1,21 @@
+# Models (large binary files)
+models/
+
+# Training logs
+logs/
+
+# LaTeX build artifacts
+report/*.aux
+report/*.bbl
+report/*.blg
+report/*.log
+report/*.out
+report/*.toc
+report/*.fls
+report/*.fdb_latexmk
+report/*.synctex.gz
+
+# Python
+__pycache__/
+*.pyc
+.DS_Store
