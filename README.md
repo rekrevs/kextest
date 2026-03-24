@@ -1,6 +1,12 @@
 # Adversarial Attacks on Cooperative Multi-Agent Reinforcement Learning
 
-**Bachelor Thesis** | KTH Royal Institute of Technology | DD143X, 15 ECTS
+> **This is not a real bachelor thesis.** It is a demonstration of what modern AI tools can produce in a few hours of interactive work — from literature review and experiment design through implementation, training, evaluation, and a 27-page LaTeX report with verified references and multi-seed statistical analysis. The entire project, including all code, experiments, and the thesis document, was carried out in a single session using [Claude Code](https://claude.ai/claude-code).
+>
+> The point is not that AI wrote a thesis. The point is that if this is what a few hours of prompting can produce, then **the traditional bachelor thesis format — where the bulk of the grade comes from executing a known methodology on a standard problem — no longer meaningfully tests what it once did.** We need to rethink what a thesis should ask of students in an era where implementation, boilerplate analysis, and even scientific writing can be largely automated. The hard parts that remain — asking the right question, exercising genuine scientific judgment, and knowing when the tool is wrong — are precisely what future thesis formats should emphasize.
+>
+> See [`PROJECT_DESCRIPTION.md`](PROJECT_DESCRIPTION.md) for the original thesis specification this was based on.
+
+**Bachelor Thesis (simulated)** | KTH Royal Institute of Technology | DD143X, 15 ECTS
 
 Supervisors: NN
 
