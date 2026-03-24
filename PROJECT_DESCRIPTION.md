@@ -4,6 +4,8 @@
 
 ## Adversarial Attacks on Multi-Agent Reinforcement Learning Systems
 
+**Supervisors:** Axel Andersson (axander@kth.se), György Dán (gyuri@kth.se)
+
 In this project, the goal is to find effective attacks against multi-agent reinforcement learning (MARL) systems. A MARL system is a system where multiple autonomous agents operate in the same environment and wants to accomplish some goal. If the agents work together, as a team, it is called cooperative MARL (c-MARL). An example of this is a search-and-rescue task where multiple autonomous agents (e.g., drones) are searching for a target.
 
 In the project we will study how robust MARL algorithms are by trying to construct attacks that causes the team of autonomous agent to fail their mission. A possible avenue could be to perturb the agents observations in some clever way, causing it to take bad decisions. One could consider both training and inference time attacks, that is, is the attacker present during the training of these algorithms or when the agent is actually used?
