@@ -286,11 +286,11 @@ where $\delta$ is the stealth threshold controlling the trade-off between attack
 \begin{equation}
     \min_{\theta_\text{adv}} \; L_\text{PPO}(\theta_\text{adv}) + \lambda \cdot \max\left(0, \; D_\text{KL}(\pi_{\theta_\text{adv}} \| \pi_\text{coop}) - \delta\right),
 \end{equation}
-where $\lambda \geq 0$ is a learnable Lagrange multiplier. The penalty term increases the loss when the KL constraint is violated, discouraging the adversary from deviating too far from the cooperative policy. The multiplier $\lambda$ is updated via dual gradient ascent:
+where $\lambda \geq 0$ is a learnable Lagrange multiplier. The penalty term increases the loss when the KL constraint is violated, discouraging the adversary from deviating too far from the cooperative policy. The multiplier $\lambda$ is updated via dual gradient ascent on the hinge-relaxed constraint, matching the primal objective:
 \begin{equation}
-    \lambda \leftarrow \lambda + \eta_\lambda \left(D_\text{KL}(\pi_{\theta_\text{adv}} \| \pi_\text{coop}) - \delta\right),
+    \lambda \leftarrow \max\!\left(0,\; \lambda + \eta_\lambda \cdot \max\!\left(0,\; D_\text{KL}(\pi_{\theta_\text{adv}} \| \pi_\text{coop}) - \delta\right)\right),
 \end{equation}
-which increases $\lambda$ when the constraint is violated and decreases it when satisfied.
+which increases $\lambda$ when the constraint is violated, leaves it unchanged when the constraint is satisfied (due to the inner $\max$), and projects onto $\lambda \geq 0$ (outer $\max$). In our implementation, we parameterize $\lambda = e^{\mu}$ and optimize $\mu$ by gradient descent, which naturally enforces $\lambda > 0$.
 
 We train stealth adversaries with $\delta \in \{0.1, 0.5, 2.0\}$, spanning tight to loose constraints.
 
@@ -381,7 +381,7 @@ FGSM (all agents) & 1.0 & $-82.2\ [-88.0, -76.4]$ & $0.005^{**}$ \\
 PGD (all agents) & 0.5 & $-67.7\ [-71.1, -64.4]$ & n.s. \\
 PGD (all agents) & 1.0 & $-68.7\ [-71.6, -65.9]$ & n.s. \\
 \midrule
-\textbf{Adversarial agent} & --- & $\mathbf{-97.2}$ & --- \\
+\textbf{Adversarial agent} & --- & $\mathbf{-80.2\ [-88.6, -71.9]}$ & $0.019^*$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -442,27 +442,27 @@ We conducted a PGD ablation study varying the number of steps (3, 5, 10, 20, 50)
 
 \begin{table}[H]
 \centering
-\caption{Attack transferability between MAPPO and QMIX. ``Source'' indicates which model was used to craft the attack; ``Target'' indicates which model is attacked.}
+\caption{Attack transferability (exploratory, single-seed evaluation). QMIX did not fully converge ($-167$ vs.\ MAPPO's $-65.5$), limiting the interpretability of these results.}
 \label{tab:transfer}
-\begin{tabular}{llrr}
+\begin{tabular}{llr}
 \toprule
-Attack & Source $\to$ Target & Mean Reward & $\Delta$ vs.\ Clean \\
+Attack & Source $\to$ Target & Mean Reward \\
 \midrule
-Clean & MAPPO & $-68.3$ & --- \\
-Clean & QMIX & $-167.0$ & --- \\
+Clean & MAPPO (5-seed) & $-65.5\ [-69.9, -61.1]$ \\
+Clean & QMIX (1-seed) & $-167.0$ \\
 \midrule
-FGSM ($\epsilon{=}0.5$) & MAPPO $\to$ MAPPO & $-73.0$ & $-7.0\%$ \\
-FGSM ($\epsilon{=}0.5$) & MAPPO $\to$ QMIX & $-161.5$ & $+3.3\%$ \\
+FGSM ($\epsilon{=}0.5$) & MAPPO $\to$ MAPPO (5-seed) & $-75.0\ [-79.6, -70.3]$ \\
+FGSM ($\epsilon{=}0.5$) & MAPPO $\to$ QMIX (1-seed) & $-161.5$ \\
 \midrule
-Adversarial agent & MAPPO $\to$ MAPPO & $-97.2$ & $-42.3\%$ \\
-Adversarial agent & MAPPO $\to$ QMIX & $-174.8$ & $-4.7\%$ \\
+Adversarial agent & MAPPO $\to$ MAPPO (5-seed) & $-80.2\ [-88.6, -71.9]$ \\
+Adversarial agent & MAPPO $\to$ QMIX (1-seed) & $-174.8$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\Cref{tab:transfer} shows limited transferability. FGSM perturbations crafted against MAPPO actually \emph{improve} QMIX's performance ($+3.3\%$), likely because the perturbation directions are policy-specific and may coincidentally push QMIX's observations toward better regions. The adversarial agent trained against MAPPO has modest impact on QMIX ($-4.7\%$) compared to its devastating effect on MAPPO ($-42.3\%$). This suggests that adversarial agents learn to exploit algorithm-specific cooperative strategies rather than universal vulnerabilities.
+\Cref{tab:transfer} presents exploratory transferability results. FGSM perturbations crafted against MAPPO do not degrade QMIX's performance ($-161.5$ vs.\ clean $-167.0$). The adversarial agent has modest additional impact on QMIX ($-174.8$, a $4.7\%$ degradation) compared to a much larger effect on MAPPO ($-80.2$, a $22\%$ degradation from the 5-seed baseline).
 
-Note that QMIX's substantially worse clean performance ($-167.0$ vs.\ $-68.3$) is due to the challenge of training value decomposition methods on this task, which is consistent with prior benchmarking studies \citep{papoudakis2021benchmarking}.
+These results are suggestive but must be interpreted with caution. QMIX's substantially worse clean performance ($-167$ vs.\ $-65.5$) reflects underconvergence of our value-decomposition implementation, consistent with prior benchmarking \citep{papoudakis2021benchmarking}. We cannot distinguish whether weak transfer reflects true algorithmic specificity or simply a poor target policy. The QMIX results use a single training seed and lack confidence intervals. We present these as a pilot study motivating future work with properly converged baselines.
 
 \subsection{Communication Robustness}
 \label{sec:comm_results}
@@ -476,21 +476,22 @@ Note that QMIX's substantially worse clean performance ($-167.0$ vs.\ $-68.3$) i
 
 \begin{table}[H]
 \centering
-\caption{Communication robustness: relative reward degradation under FGSM attack.}
+\caption{Communication robustness: MAPPO (5 seeds, 95\% CI) vs.\ CommNet (single model, $\pm$ std over 100 episodes). The asymmetry in statistical basis means direct numerical comparisons should be made cautiously.}
 \label{tab:comm}
 \begin{tabular}{lrr}
 \toprule
-FGSM $\epsilon$ & MAPPO degradation & CommNet degradation \\
+FGSM $\epsilon$ & MAPPO [95\% CI] & CommNet (single model) \\
 \midrule
-0.1 & $-0.5\%$ & $-3.5\%$ \\
-0.2 & $-0.5\%$ & $-6.8\%$ \\
-0.5 & $-7.0\%$ & $-5.9\%$ \\
-1.0 & $-14.4\%$ & $-6.1\%$ \\
+0 (clean) & $-65.5\ [-69.9, -61.1]$ & $-72.6 \pm 20.3$ \\
+0.1 & $-66.3\ [-69.2, -63.5]$ & $-71.0 \pm 21.4$ \\
+0.2 & $-68.8\ [-71.5, -66.1]$ & $-71.3 \pm 18.4$ \\
+0.5 & $-75.0\ [-79.6, -70.3]$ & $-74.3 \pm 19.8$ \\
+1.0 & $-82.2\ [-88.0, -76.4]$ & $-73.9 \pm 20.3$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\Cref{fig:comm_robustness,tab:comm} reveal a nuanced picture. At small perturbations ($\epsilon \leq 0.2$), CommNet is \emph{more vulnerable} than MAPPO: a small perturbation to one agent's observation propagates through the communication channel and affects all agents' decisions. However, at large perturbations ($\epsilon \geq 0.5$), CommNet plateaus while MAPPO continues to degrade. This suggests that at high noise levels, the communication messages from unperturbed agents provide a corrective signal that partially counteracts the adversarial noise. This finding has important implications for system design: communication is a double-edged sword in adversarial settings.
+\Cref{fig:comm_robustness,tab:comm} show a suggestive pattern, though CommNet is evaluated with only a single training seed and comparisons must be interpreted cautiously. MAPPO's reward degrades monotonically with $\epsilon$, reaching $-82.2$ at $\epsilon = 1.0$. CommNet's reward is relatively stable across all $\epsilon$ values ($-71$ to $-74$), suggesting that the communication channel's averaging operation may act as a low-pass filter at high noise levels. However, CommNet's \emph{clean} performance is also worse ($-72.6$ vs.\ $-65.5$), so the apparent robustness at high $\epsilon$ may partly reflect a lower performance ceiling rather than genuine resilience. Multi-seed CommNet training would be needed to confirm these observations.
 
 \subsection{Stealth Attack Trade-off}
 \label{sec:stealth_results}
@@ -504,24 +505,24 @@ FGSM $\epsilon$ & MAPPO degradation & CommNet degradation \\
 
 \begin{table}[H]
 \centering
-\caption{Stealth attack trade-off: effectiveness vs.\ detectability.}
+\caption{Stealth attack trade-off: effectiveness vs.\ detectability. Reward is mean across 5 MAPPO seeds [95\% CI]. Achieved KL is measured empirically over evaluation episodes. TPR/FPR from the single-seed anomaly detector.}
 \label{tab:stealth}
-\begin{tabular}{lrrr}
+\begin{tabular}{lrrrr}
 \toprule
-Agent type & Mean Reward & $\Delta$ vs.\ Clean & TPR (\%) \\
+Agent type & Reward [95\% CI] & Achieved KL & TPR & FPR \\
 \midrule
-Clean & $-68.3$ & --- & $0.0$ \\
-Unconstrained adversary & $-97.2$ & $-42.3\%$ & $98.2$ \\
-Stealth ($\delta = 2.0$) & $-74.9$ & $-9.7\%$ & $37.5$ \\
-Stealth ($\delta = 0.5$) & $-69.7$ & $-2.0\%$ & $27.3$ \\
-Stealth ($\delta = 0.1$) & $-69.7$ & $-2.0\%$ & $27.3$ \\
+Clean & $-65.5\ [-69.9, -61.1]$ & --- & $0\%$ & $0\%$ \\
+Unconstrained & $-80.2\ [-88.6, -71.9]$ & --- & $98\%$ & $0\%$ \\
+Stealth ($\delta = 2.0$) & $-74.4\ [-78.8, -70.1]$ & $4.78 \pm 2.63$ & $38\%$ & $0\%$ \\
+Stealth ($\delta = 0.5$) & $-72.6\ [-77.3, -67.9]$ & $4.51 \pm 2.53$ & $27\%$ & $0\%$ \\
+Stealth ($\delta = 0.1$) & $-72.6\ [-77.3, -67.8]$ & $4.51 \pm 2.53$ & $27\%$ & $0\%$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\Cref{fig:stealth,tab:stealth} reveal a clear trade-off between attack effectiveness and stealth. The unconstrained adversary degrades team performance by 42.3\% but is detected 98.2\% of the time. The stealth adversary with $\delta = 2.0$ achieves a meaningful 9.7\% degradation while reducing the detection rate to 37.5\%. Tighter constraints ($\delta \leq 0.5$) yield adversaries with minimal impact ($-2.0\%$) and lower but non-trivial detection rates (27.3\% TPR). That $\delta = 0.1$ and $\delta = 0.5$ produce identical results suggests both constraints are tight enough that the adversary effectively converges to the cooperative policy---the constraint dominates the adversarial objective.
+\Cref{fig:stealth,tab:stealth} reveal that \textbf{the KL constraint was not effectively enforced}: all three stealth variants achieve KL $\approx 4.5$, far exceeding their respective targets $\delta$. This means the Lagrange multiplier did not grow fast enough to dominate the adversarial objective. Consequently, $\delta = 0.1$ and $\delta = 0.5$ produce identical behavior---neither reached its target.
 
-The false positive rate is 0\% across all experiments, indicating that the anomaly detector never falsely accuses cooperative agents. This asymmetry---high specificity, variable sensitivity---suggests that detection is reliable when it fires, but stealthy adversaries can operate under the detection threshold.
+Despite the constraint failure, the stealth adversaries are still \emph{less aggressive} than the unconstrained one (reward $-72$ to $-74$ vs.\ $-80$), and correspondingly harder to detect (TPR $27$--$38\%$ vs.\ $98\%$). This suggests the KL penalty has \emph{some} regularizing effect, but a stronger enforcement mechanism (e.g., a larger initial $\lambda$ or hard KL clipping) would be needed to achieve targeted stealth levels. The false positive rate is $0\%$ across all experiments.
 
 \subsection{Countermeasure Evaluation}
 
@@ -568,7 +569,7 @@ Smoothing $\alpha = 0.8$ & --- & $-77.3\ [-81.6, -72.9]$ \\
 
 \subsection{Behavioral vs.\ Observation Attacks}
 
-Our results show that behavioral attacks (adversarial agent replacement) are far more devastating than observation perturbation attacks: $-42.3\%$ vs.\ $-14.4\%$ for the strongest FGSM. However, this comparison must be interpreted with care, because the two attack types operate under fundamentally different threat models. Observation perturbation assumes the attacker can add bounded noise to sensor readings---a realistic threat in many settings. Adversarial agent replacement assumes the attacker has \emph{full insider access}: the ability to replace an agent's entire policy with a malicious one, which requires compromising the agent's software or hardware. The asymmetry in attacker power naturally leads to asymmetry in attack effectiveness.
+Our results show that behavioral attacks (adversarial agent replacement) cause greater damage than observation perturbation attacks: the adversarial agent degrades reward to $-80.2$ (a $22\%$ degradation from the $-65.5$ clean baseline), compared to $-82.2$ ($25\%$ degradation) for FGSM at $\epsilon = 1.0$. However, this comparison must be interpreted with care, because the two attack types operate under fundamentally different threat models. Observation perturbation assumes the attacker can add bounded noise to sensor readings---a realistic threat in many settings. Adversarial agent replacement assumes the attacker has \emph{full insider access}: the ability to replace an agent's entire policy with a malicious one, which requires compromising the agent's software or hardware. The asymmetry in attacker power naturally leads to asymmetry in attack effectiveness.
 
 The practical implication is not simply that ``behavioral attacks are worse,'' but rather that \emph{the two threats require different defenses}: observation perturbation calls for robust perception (smoothing, certified defenses), while agent compromise calls for access control, attestation, and anomaly detection.
 
@@ -619,7 +620,7 @@ This thesis presents a systematic study of adversarial attacks on cooperative mu
 Our key findings are:
 
 \begin{enumerate}
-    \item \textbf{Behavioral attacks are far more effective, but under a stronger threat model.} A trained adversarial agent degrades team performance by 42\%, compared to 25\% for the strongest observation perturbation ($p < 0.01$). However, the two attacks assume fundamentally different attacker capabilities (sensor noise vs.\ insider compromise), and require different defensive strategies.
+    \item \textbf{Behavioral attacks cause substantial damage under a stronger threat model.} A trained adversarial agent degrades team reward by $22\%$ (to $-80.2$, $p < 0.05$), while the strongest observation perturbation (FGSM $\epsilon = 1.0$) causes $25\%$ degradation ($p < 0.01$). The two attacks assume fundamentally different attacker capabilities (sensor noise vs.\ insider compromise) and require different defensive strategies.
 
     \item \textbf{FGSM outperforms PGD in discrete action spaces.} Single-step attacks cross more decision boundaries than iterative attacks. This finding is robust across a PGD ablation (3--50 steps, with/without random start) and is specific to discrete-action policies.
 
@@ -627,9 +628,9 @@ Our key findings are:
 
     \item \textbf{Communication is a double-edged sword.} CommNet amplifies adversarial noise at low perturbation levels but provides resilience at high levels through message averaging.
 
-    \item \textbf{Stealth attacks reveal a clear effectiveness--detectability trade-off.} KL-constrained adversaries at $\delta = 2.0$ achieve 10\% reward degradation with reduced detection (TPR $= 37.5\%$), while tighter constraints ($\delta \leq 0.5$) effectively prevent adversarial behavior.
+    \item \textbf{Stealth attacks show a partial effectiveness--detectability trade-off, but the KL constraint was not effectively enforced.} All stealth variants achieved KL $\approx 4.5$, far exceeding their targets. Nevertheless, the KL penalty provided some regularization: stealth adversaries were less aggressive ($-72$ to $-74$) and harder to detect (TPR $27$--$38\%$) than the unconstrained adversary ($-80$, TPR $98\%$). Stronger enforcement mechanisms are needed.
 
-    \item \textbf{No tested defense substantially mitigates FGSM.} FGSM adversarial training destabilizes RL, observation smoothing provides only marginal benefit, and adaptive attackers can compensate for smoothing. This motivates future work on certified defenses.
+    \item \textbf{In our setup, no tested defense substantially mitigates FGSM.} FGSM adversarial training destabilized on-policy RL training in this environment, and observation smoothing provided only marginal benefit that an adaptive attacker could compensate for. These negative results are specific to our discrete-action Simple Spread setting and PPO-based training; other environments, architectures, or training regimes may respond differently.
 \end{enumerate}
 
 \subsection{Future Work}
